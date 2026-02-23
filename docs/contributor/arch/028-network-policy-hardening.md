@@ -169,7 +169,7 @@ We must test the network policies using our E2E tests to ensure they function as
          Ports: 9090
      - **Egress Rules:**
        - To: Pod label matching `app.kubernetes.io/name: fluent-bit`<br>
-         Ports: 2020,2021
+         Ports: 2020
        - To: Pod label matching `app.kubernetes.io/component: agent`<br>
          Ports: 8888
        - To: Pod label matching `app.kubernetes.io/component: gateway`<br>
