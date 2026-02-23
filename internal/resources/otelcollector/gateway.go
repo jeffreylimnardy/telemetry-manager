@@ -184,9 +184,7 @@ func NewTraceGatewayApplierDeleter(globals config.Global, image, priorityClassNa
 
 func (gad *GatewayApplierDeleter) ApplyResources(ctx context.Context, c client.Client, opts GatewayApplyOptions) error {
 	var (
-		name         = types.NamespacedName{Namespace: gad.globals.TargetNamespace(), Name: gad.baseName}
-		otlpPorts    = gatewayIngressOTLPPorts()
-		metricsPorts = gatewayIngressMetricsPorts(opts.IstioEnabled)
+		name = types.NamespacedName{Namespace: gad.globals.TargetNamespace(), Name: gad.baseName}
 	)
 
 	if err := applyCommonResources(ctx, c, name, commonresources.LabelValueK8sComponentGateway, gad.rbac); err != nil {
@@ -205,27 +203,7 @@ func (gad *GatewayApplierDeleter) ApplyResources(ctx context.Context, c client.C
 
 	configChecksum := configchecksum.Calculate([]corev1.ConfigMap{*configMap}, []corev1.Secret{*secret})
 
-	networkPolicies := []*networkingv1.NetworkPolicy{
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithNameSuffix("metrics"),
-			commonresources.WithIngressFromPodsInAllNamespaces(
-				map[string]string{
-					commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
-				},
-				metricsPorts,
-			),
-		),
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithIngressFromAny(otlpPorts),
-			commonresources.WithEgressToAny(),
-		),
-	}
+	networkPolicies := makeGatewayNetworkPolicies(name, opts.IstioEnabled)
 
 	for _, np := range networkPolicies {
 		if err := k8sutils.CreateOrUpdateNetworkPolicy(ctx, c, np); err != nil {
@@ -471,6 +449,36 @@ func (gad *GatewayApplierDeleter) makeAnnotations(configChecksum string, opts Ga
 	}
 
 	return annotations
+}
+
+func makeGatewayNetworkPolicies(name types.NamespacedName, istioEnabled bool) []*networkingv1.NetworkPolicy {
+	var (
+		otlpPorts    = gatewayIngressOTLPPorts()
+		metricsPorts = gatewayIngressMetricsPorts(istioEnabled)
+	)
+
+	metricsNetworkPolicy := commonresources.MakeNetworkPolicy(
+		name,
+		commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
+		commonresources.MakeDefaultSelectorLabels(name.Name),
+		commonresources.WithNameSuffix("metrics"),
+		commonresources.WithIngressFromPodsInAllNamespaces(
+			map[string]string{
+				commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
+			},
+			metricsPorts,
+		),
+	)
+
+	gatewayNetworkPolicies := commonresources.MakeNetworkPolicy(
+		name,
+		commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
+		commonresources.MakeDefaultSelectorLabels(name.Name),
+		commonresources.WithIngressFromAny(otlpPorts),
+		commonresources.WithEgressToAny(),
+	)
+	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, gatewayNetworkPolicies}
+
 }
 
 func gatewayIngressOTLPPorts() []int32 {

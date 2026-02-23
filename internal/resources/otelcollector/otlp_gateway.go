@@ -87,9 +87,7 @@ func NewOTLPGatewayApplierDeleter(globals config.Global, image, priorityClassNam
 // ApplyResources creates or updates the OTLP gateway DaemonSet and Legacy otlp logs service.
 func (o *OTLPGatewayApplierDeleter) ApplyResources(ctx context.Context, c client.Client, opts GatewayApplyOptions) error {
 	var (
-		name         = types.NamespacedName{Namespace: o.globals.TargetNamespace(), Name: o.baseName}
-		otlpPorts    = gatewayIngressOTLPPorts()
-		metricsPorts = gatewayIngressMetricsPorts(opts.IstioEnabled)
+		name = types.NamespacedName{Namespace: o.globals.TargetNamespace(), Name: o.baseName}
 	)
 
 	if err := applyCommonResources(ctx, c, name, commonresources.LabelValueK8sComponentGateway, o.rbac); err != nil {
@@ -108,27 +106,7 @@ func (o *OTLPGatewayApplierDeleter) ApplyResources(ctx context.Context, c client
 
 	configChecksum := configchecksum.Calculate([]corev1.ConfigMap{*configMap}, []corev1.Secret{*secret})
 
-	networkPolicies := []*networkingv1.NetworkPolicy{
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithNameSuffix("metrics"),
-			commonresources.WithIngressFromPodsInAllNamespaces(
-				map[string]string{
-					commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
-				},
-				metricsPorts,
-			),
-		),
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentGateway),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithIngressFromAny(otlpPorts),
-			commonresources.WithEgressToAny(),
-		),
-	}
+	networkPolicies := makeGatewayNetworkPolicies(name, opts.IstioEnabled)
 
 	for _, np := range networkPolicies {
 		if err := k8sutils.CreateOrUpdateNetworkPolicy(ctx, c, np); err != nil {

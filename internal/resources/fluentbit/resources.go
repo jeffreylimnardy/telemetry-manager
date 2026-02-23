@@ -169,25 +169,7 @@ func (aad *AgentApplierDeleter) ApplyResources(ctx context.Context, c client.Cli
 		return err
 	}
 
-	networkPolicies := []*networkingv1.NetworkPolicy{
-		commonresources.MakeNetworkPolicy(
-			aad.daemonSetName,
-			makeLabels(),
-			selectorLabels(),
-			commonresources.WithNameSuffix("metrics"),
-			commonresources.WithIngressFromPodsInAllNamespaces(
-				map[string]string{
-					commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
-				},
-				makeFluentBitMetricsPorts(opts.IstioEnabled)),
-		),
-		commonresources.MakeNetworkPolicy(
-			aad.daemonSetName,
-			makeLabels(),
-			selectorLabels(),
-			commonresources.WithEgressToAny(),
-		),
-	}
+	networkPolicies := makeNetworkPolicies(aad.daemonSetName, opts.IstioEnabled)
 
 	for _, np := range networkPolicies {
 		if err := k8sutils.CreateOrUpdateNetworkPolicy(ctx, c, np); err != nil {
@@ -708,6 +690,28 @@ func makeTLSFileConfigSecret(name types.NamespacedName, tlsFileConfigSecret map[
 		},
 		Data: tlsFileConfigSecret,
 	}
+}
+
+func makeNetworkPolicies(name types.NamespacedName, istioEnabled bool) []*networkingv1.NetworkPolicy {
+	metricsNetworkPolicy := commonresources.MakeNetworkPolicy(
+		name,
+		makeLabels(),
+		selectorLabels(),
+		commonresources.WithNameSuffix("metrics"),
+		commonresources.WithIngressFromPodsInAllNamespaces(
+			map[string]string{
+				commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
+			},
+			makeFluentBitMetricsPorts(istioEnabled)),
+	)
+
+	fluentBitNetworkPolicy := commonresources.MakeNetworkPolicy(
+		name,
+		makeLabels(),
+		selectorLabels(),
+		commonresources.WithEgressToAny(),
+	)
+	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, fluentBitNetworkPolicy}
 }
 
 func makeLabels() map[string]string {

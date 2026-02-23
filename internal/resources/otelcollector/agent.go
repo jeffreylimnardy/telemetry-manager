@@ -148,7 +148,6 @@ func NewMetricAgentApplierDeleter(globals config.Global, image, priorityClassNam
 
 func (aad *AgentApplierDeleter) ApplyResources(ctx context.Context, c client.Client, opts AgentApplyOptions) error {
 	name := types.NamespacedName{Namespace: aad.globals.TargetNamespace(), Name: aad.baseName}
-	ingressMetricsPorts := agentIngressMetricsPorts(opts.IstioEnabled)
 
 	if err := applyCommonResources(ctx, c, name, commonresources.LabelValueK8sComponentAgent, aad.rbac); err != nil {
 		return fmt.Errorf("failed to create common resource: %w", err)
@@ -172,25 +171,7 @@ func (aad *AgentApplierDeleter) ApplyResources(ctx context.Context, c client.Cli
 
 	configChecksum := configchecksum.Calculate([]corev1.ConfigMap{*configMap}, secretsInChecksum)
 
-	networkPolicies := []*networkingv1.NetworkPolicy{
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentAgent),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithNameSuffix("metrics"),
-			commonresources.WithIngressFromPodsInAllNamespaces(
-				map[string]string{
-					commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
-				},
-				ingressMetricsPorts),
-		),
-		commonresources.MakeNetworkPolicy(
-			name,
-			commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentAgent),
-			commonresources.MakeDefaultSelectorLabels(name.Name),
-			commonresources.WithEgressToAny(),
-		),
-	}
+	networkPolicies := makeAgentNetworkPolicies(name, opts.IstioEnabled)
 
 	for _, np := range networkPolicies {
 		if err := k8sutils.CreateOrUpdateNetworkPolicy(ctx, c, np); err != nil {
@@ -268,6 +249,29 @@ func (aad *AgentApplierDeleter) makeAgentDaemonSet(configChecksum string, opts A
 		metadata,
 		podSpec,
 	)
+}
+
+func makeAgentNetworkPolicies(name types.NamespacedName, istioEnabled bool) []*networkingv1.NetworkPolicy {
+
+	metricsNetworkPolicy := commonresources.MakeNetworkPolicy(
+		name,
+		commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentAgent),
+		commonresources.MakeDefaultSelectorLabels(name.Name),
+		commonresources.WithNameSuffix("metrics"),
+		commonresources.WithIngressFromPodsInAllNamespaces(
+			map[string]string{
+				commonresources.LabelKeyTelemetryMetricsScraping: commonresources.LabelValueTelemetryMetricsScraping,
+			},
+			agentIngressMetricsPorts(istioEnabled)),
+	)
+	agentNetworkPolicy := commonresources.MakeNetworkPolicy(
+		name,
+		commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentAgent),
+		commonresources.MakeDefaultSelectorLabels(name.Name),
+		commonresources.WithEgressToAny(),
+	)
+
+	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, agentNetworkPolicy}
 }
 
 func makeLogAgentAnnotations(configChecksum string, opts AgentApplyOptions) map[string]string {
