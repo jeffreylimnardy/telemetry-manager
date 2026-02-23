@@ -477,8 +477,8 @@ func makeGatewayNetworkPolicies(name types.NamespacedName, istioEnabled bool) []
 		commonresources.WithIngressFromAny(otlpPorts),
 		commonresources.WithEgressToAny(),
 	)
-	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, gatewayNetworkPolicies}
 
+	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, gatewayNetworkPolicies}
 }
 
 func gatewayIngressOTLPPorts() []int32 {

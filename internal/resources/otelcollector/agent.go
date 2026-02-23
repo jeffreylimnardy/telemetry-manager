@@ -252,7 +252,6 @@ func (aad *AgentApplierDeleter) makeAgentDaemonSet(configChecksum string, opts A
 }
 
 func makeAgentNetworkPolicies(name types.NamespacedName, istioEnabled bool) []*networkingv1.NetworkPolicy {
-
 	metricsNetworkPolicy := commonresources.MakeNetworkPolicy(
 		name,
 		commonresources.MakeDefaultLabels(name.Name, commonresources.LabelValueK8sComponentAgent),

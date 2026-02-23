@@ -711,6 +711,7 @@ func makeNetworkPolicies(name types.NamespacedName, istioEnabled bool) []*networ
 		selectorLabels(),
 		commonresources.WithEgressToAny(),
 	)
+
 	return []*networkingv1.NetworkPolicy{metricsNetworkPolicy, fluentBitNetworkPolicy}
 }
 
