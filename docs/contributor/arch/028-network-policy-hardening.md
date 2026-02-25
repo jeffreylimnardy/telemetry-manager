@@ -293,8 +293,8 @@ Egress rules for the following components will be restricted to only whitelist p
    - **Ingress Rules:**
      - From: Pod label matching `networking.kyma-project.io/metrics-scraping: allowed` in any namespace (empty namespace selector)<br>
        Ports: 8888, 15090(optional)
-     - From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>
-       Ports: 4318, 4317
+     - **From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>**
+       **Ports: 4318, 4317**
    - **Egress Rules:**
      - To: Any IP<br>
        **Ports: A set of ports used to connect to external logging services**
@@ -304,8 +304,8 @@ Egress rules for the following components will be restricted to only whitelist p
    - **Ingress Rules:**
      - From: Pod label matching `networking.kyma-project.io/metrics-scraping: allowed` in any namespace (empty namespace selector)<br>
        Ports: 8888, 15090(optional)
-     - From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>
-       Ports: 4318, 4317
+     - **From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>**
+       **Ports: 4318, 4317**
    - **Egress Rules:**
      - To: Any IP<br>
        **Ports: A set of ports used to connect to external metric services**
@@ -315,8 +315,8 @@ Egress rules for the following components will be restricted to only whitelist p
    - **Ingress Rules:**
      - From: Pod label matching `networking.kyma-project.io/metrics-scraping: allowed` in any namespace (empty namespace selector)<br>
        Ports: 8888, 15090(optional)
-     - From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>
-       Ports: 4318, 4317
+     - **From: Pod label matching `networking.kyma-project.io/telemetry-otlp: allowed` in any namespace (empty namespace selector)<br>**
+       **Ports: 4318, 4317**
    - **Egress Rules:**
      - To: Any IP<br>
        **Ports: A set of ports used to connect to external tracing services**
