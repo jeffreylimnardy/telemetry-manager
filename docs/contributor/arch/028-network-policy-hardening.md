@@ -114,18 +114,14 @@ The current network policies are too weak. They do not meet the requirements des
 
 We also decided to use the label selector `networking.kyma-project.io/metrics-scraping: allowed` not only for RMA, but also for metric agent, self-monitoring, and customer-managed Prometheus deployments. Gardener system Pods cannot be labeled in the zero-trust mode, so these Pods must be excluded from scraping.
 
-We must test the network policies using our E2E tests to ensure they function as intended. The problem is that k3s uses Flannel as the default CNI. Real Kyma clusters typically use Calico, which behaves slightly differently. We need to find a way to run our E2E tests with Calico to accurately validate the network policies.
-
 ### What to do?
 
 # Phase 1: Hardening Existing Network Policies
 
 - Rename existing network policies to follow new naming conventions: `kyma-project.io--telemetry-<network-policy-name>`
 - Remove health check ports from ingress rules because they have no impact.
-- Remove Gardener system Pods from our scraping jobs.
 - Implement cross-component network policies to allow essential services like DNS and Kubernetes API access.
 - Harden telemetry manager and self-monitoring because it requires no breaking changes.
-- Either expand Gardener E2E test suite to cover more scenarios or find a way to run E2E tests with Calico CNI.
 - Separate self-monitoring webhook from admission webhooks in telemetry manager to allow more fine-grained ingress rules.
 
 ### Network Policies After Phase 1
@@ -170,7 +166,9 @@ We must test the network policies using our E2E tests to ensure they function as
      - **Egress Rules:**
        - To: Pod label matching `app.kubernetes.io/name: fluent-bit`<br>
          Ports: 2020
-       - To: Pod label matching `app.kubernetes.io/component: agent`<br>
+       - To: Pod label matching `app.kubernetes.io/name: metric-agent`<br>
+         Ports: 8888
+       - To: Pod label matching `app.kubernetes.io/name: log-agent`<br>
          Ports: 8888
        - To: Pod label matching `app.kubernetes.io/component: gateway`<br>
          Ports: 8888
@@ -243,18 +241,21 @@ We must test the network policies using our E2E tests to ensure they function as
 
 # Phase 2: Introduce Zero-trust Network Policies
 
+- Remove Gardener system Pods from our scraping jobs. Currently prometheus receiver scrapes from Gardener system pods if the user enabled prometheus input and includes system namespaces (kube-system). Since Gardener labels their system pods with prometheus annotations, our metric agent will try to scrape these pods, however, in zero-trust mode we specifically only allow our worklaods to scrape from pods annotated with `networking.kyma-project.io/metrics-scraping: allowed` label. Thus the metric agent won't be able to scrape from Gardener system pods, since we cannot label them with our whitelist label.
 - Introduce a new label `networking.kyma-project.io/telemetry-otlp: allowed` for customer workloads that want to send OTLP data to telemetry gateways. This label will be used in network policies to allow incoming traffic from customer workloads to telemetry gateways on OTLP ports (4318, 4317).
 - Implement a feature toggle in the Telemetry CR to enable/disable extra rules that harden customer-to-telemetry communication as well as RMA, cross-Kyma module communication. Because the Telemetry module already has basic network policies in place, it's illogical to use the toggle name  **networkPoliciesEnabled** (because we'll still have network policies even if it's set to `false`). However, we will maintain this toggle for consistency with other Kyma modules.
 - Document the required Pod labels for customer workloads to ensure proper communication with telemetry components.
 
 
-### Proposed Network Policy Changes from Phase 1
+### Proposed Network Policy Changes for Phase 2
 
 Cross-component policies have been implemented in Phase 1, so in Phase 2 we will focus on introducing zero-trust policies for customer-to-telemetry communication and RMA, cross-Kyma module communication.
 
 #### Component-specific Policies
 
 All component egress to customer workloads must now be restricted by port number, previously we allowed all egress traffic on any port. The highlighted text indicates the new rules that will be added in Phase 2 to further restrict egress traffic.
+
+Egress rules for the following components will be restricted to only whitelist ports which are used to connect to customer backends. We have a utility function in `metricpipelineutils` which extracts customer backend ports.
 
 1. **FluentBit Agent**
    - **Network Policy Name:** `kyma-project.io--telemetry-fluent-bit`
