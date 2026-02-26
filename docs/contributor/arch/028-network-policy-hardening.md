@@ -30,8 +30,6 @@ date: 2025-09-18
 * Ingress: Metric scraping (RMA), health checks, alertmanager webhook, admission and conversion webhooks
 * Egress: Kubernetes API, DNS, self-monitor alert queries
 
-### Current Network Policies
-
 ### Current Network Policy Configuration
 
 Current network policies are too weak and do not meet the requirements decsribed here: https://github.com/kyma-project/kyma/issues/18818.
@@ -113,8 +111,6 @@ Current network policies are too weak and do not meet the requirements decsribed
 The current network policies are too weak. They do not meet the requirements described in https://github.com/kyma-project/kyma/issues/18818. These policies allow all IP addresses for both incoming and outgoing traffic. They only limit ports for incoming traffic, which means they can be made stronger. However, we will still need to allow any IP address (0.0.0.0/0) in some cases for incoming and outgoing rules. External services like CLS and Dynatrace, as well as Kube API server, use different IP address ranges that we cannot predict. This makes it hard to restrict outgoing traffic by IP address. Instead, we will restrict outgoing traffic by port number.
 
 We also decided to use the label selector `networking.kyma-project.io/metrics-scraping: allowed` not only for RMA, but also for metric agent, self-monitoring, and customer-managed Prometheus deployments. Gardener system Pods cannot be labeled in the zero-trust mode, so these Pods must be excluded from scraping.
-
-### What to do?
 
 # Phase 1: Hardening Existing Network Policies
 
