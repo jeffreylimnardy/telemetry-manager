@@ -10,23 +10,23 @@ date: 2025-09-18
 
 ### Communication Flow Analysis
 
-#### FluentBit, Log Agent:
+#### FluentBit, Log Agent
 * Ingress: Metric scraping (self-monitoring and RMA) and health checks
 * Egress: Kubernetes API, DNS, external logging services (for example, CLS)
 
-#### Log, Trace, Metric Gateway:
+#### Log, Trace, Metric Gateway
 * Ingress: Metric scraping (self-monitoring and RMA), health checks, OTLP data ingested from customer workloads
 * Egress: Kubernetes API, DNS, external telemetry backends (for example, CLS or Dynatrace)
 
-#### Metric Agent:
+#### Metric Agent
 * Ingress: Metric scraping (self-monitoring and RMA), health checks
 * Egress: Kubernetes API, DNS, Kubelet, scraping customer workloads metrics, external telemetry backends (for example, CLS or Dynatrace)
 
-#### Self-Monitor:
+#### Self-Monitor
 * Ingress: Metric scraping (RMA), health checks, alert queries
 * Egress: Kubernetes API, DNS, scraping module components metrics
 
-#### Telemetry Manager:
+#### Telemetry Manager
 * Ingress: Metric scraping (RMA), health checks, alertmanager webhook, admission and conversion webhooks
 * Egress: Kubernetes API, DNS, self-monitor alert queries
 
@@ -112,7 +112,7 @@ The current network policies are too weak. They do not meet the requirements des
 
 We also decided to use the label selector `networking.kyma-project.io/metrics-scraping: allowed` not only for RMA, but also for metric agent, self-monitoring, and customer-managed Prometheus deployments. Gardener system Pods cannot be labeled in the zero-trust mode, so these Pods must be excluded from scraping.
 
-# Phase 1: Hardening Existing Network Policies
+### Phase 1: Hardening Existing Network Policies
 
 - Rename existing network policies to follow new naming conventions: `kyma-project.io--telemetry-<network-policy-name>`
 - Remove health check ports from ingress rules because they have no impact.
@@ -120,9 +120,9 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
 - Harden telemetry manager and self-monitoring because it requires no breaking changes.
 - Separate self-monitoring webhook from admission webhooks in telemetry manager to allow more fine-grained ingress rules.
 
-### Network Policies After Phase 1
+#### Network Policies After Phase 1
 
-#### Cross-component Policies (use Telemetry module-identifier label selector)
+##### Cross-component Policies (use Telemetry module-identifier label selector)
 
 1. **Allow DNS Resolution**
     - **Policy Name:** `kyma-project.io--telemetry-allow-to-dns`
@@ -146,7 +146,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
         - From: Any IP<br>
           Ports: 9443
 
-### Component-specific Policies
+##### Component-specific Policies
 
 1. **Telemetry Manager**
    - **Network Policy Name:** `kyma-project.io--telemetry-manager`
@@ -243,11 +243,11 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
 - Document the required Pod labels for customer workloads to ensure proper communication with telemetry components.
 
 
-### Proposed Network Policy Changes for Phase 2
+#### Proposed Network Policy Changes for Phase 2
 
 Phase 1 implements the cross-component policies. Phase 2 focuses on introducing zero-trust policies for customer-to-telemetry, RMA, and cross-Kyma module communication.
 
-#### Component-specific Policies
+##### Component-specific Policies
 
 This phase restricts all component egress traffic by port number. Previously, we allowed all egress traffic on any port. The highlighted text in the following sections indicates the new rules that further restrict egress traffic.
 
