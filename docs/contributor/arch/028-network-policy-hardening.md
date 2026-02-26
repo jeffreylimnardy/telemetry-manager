@@ -32,7 +32,7 @@ date: 2025-09-18
 
 ### Current Network Policy Configuration
 
-Current network policies are too weak and do not meet the requirements decsribed here: https://github.com/kyma-project/kyma/issues/18818.
+Current network policies are too weak and do not meet the requirements described here: https://github.com/kyma-project/kyma/issues/18818.
 
 1. **FluentBit Agent**
    - **Network Policy Name:** `telemetry-fluent-bit`
