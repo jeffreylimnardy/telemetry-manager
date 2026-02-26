@@ -235,7 +235,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
           Ports: 8888, 15090(optional)
 
 
-# Phase 2: Introduce Zero-Trust Network Policies
+### Phase 2: Introduce Zero-Trust Network Policies
 
 - Exclude Gardener system Pods from scraping jobs. Our metric agent's Prometheus receiver discovers and attempts to scrape Gardener system Pods because they have standard Prometheus annotations. However, in zero-trust mode, the agent can only scrape Pods with the label `networking.kyma-project.io/metrics-scraping: allowed`. Because we cannot apply this label to Gardener-managed Pods, the scraping attempts fail. To prevent these failures, the scraping configuration must explicitly exclude Gardener system Pods.
 - Introduce a new label `networking.kyma-project.io/telemetry-otlp: allowed` for customer workloads that send OTLP data to Telemetry gateways. Network policies use this label to allow incoming traffic from customer workloads to Telemetry gateways on OTLP ports (4318, 4317).
