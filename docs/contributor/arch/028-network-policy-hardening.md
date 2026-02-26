@@ -34,7 +34,7 @@ date: 2025-09-18
 
 ### Current Network Policy Configuration
 
-Current network policies are too weak and do not meet the requirements desribed here: https://github.com/kyma-project/kyma/issues/18818.
+Current network policies are too weak and do not meet the requirements decsribed here: https://github.com/kyma-project/kyma/issues/18818.
 
 1. **FluentBit Agent**
    - **Network Policy Name:** `telemetry-fluent-bit`
@@ -215,7 +215,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
           Ports: 8888, 15090(optional)
 
 7. OTel Metric Gateway
-    - **Network Policy Name:** `kyma-project.io--telemetry-metric-gateway
+    - **Network Policy Name:** `kyma-project.io--telemetry-metric-gateway`
       - **Egress Rules:**
         - To: Any IP<br>
       - **Ingress Rules:**
@@ -239,23 +239,23 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
           Ports: 8888, 15090(optional)
 
 
-# Phase 2: Introduce Zero-trust Network Policies
+# Phase 2: Introduce Zero-Trust Network Policies
 
 - Remove Gardener system Pods from our scraping jobs. Currently prometheus receiver scrapes from Gardener system pods if the user enabled prometheus input and includes system namespaces (kube-system). Since Gardener labels their system pods with prometheus annotations, our metric agent will try to scrape these pods, however, in zero-trust mode we specifically only allow our worklaods to scrape from pods annotated with `networking.kyma-project.io/metrics-scraping: allowed` label. Thus the metric agent won't be able to scrape from Gardener system pods, since we cannot label them with our whitelist label.
-- Introduce a new label `networking.kyma-project.io/telemetry-otlp: allowed` for customer workloads that want to send OTLP data to telemetry gateways. This label will be used in network policies to allow incoming traffic from customer workloads to telemetry gateways on OTLP ports (4318, 4317).
-- Implement a feature toggle in the Telemetry CR to enable/disable extra rules that harden customer-to-telemetry communication as well as RMA, cross-Kyma module communication. Because the Telemetry module already has basic network policies in place, it's illogical to use the toggle name  **networkPoliciesEnabled** (because we'll still have network policies even if it's set to `false`). However, we will maintain this toggle for consistency with other Kyma modules.
+- Introduce a new label `networking.kyma-project.io/telemetry-otlp: allowed` for customer workloads that send OTLP data to Telemetry gateways. Network policies use this label to allow incoming traffic from customer workloads to Telemetry gateways on OTLP ports (4318, 4317).
+- Implement a feature toggle in the Telemetry CR to enable or disable the stricter network policy rules. These rules harden communication for customer-to-telemetry, RMA, and cross-Kyma modules. Although the name **networkPoliciesEnabled** is not perfectly accurate because basic policies always exist, we use it to maintain consistency with other Kyma modules. 
 - Document the required Pod labels for customer workloads to ensure proper communication with telemetry components.
 
 
 ### Proposed Network Policy Changes for Phase 2
 
-Cross-component policies have been implemented in Phase 1, so in Phase 2 we will focus on introducing zero-trust policies for customer-to-telemetry communication and RMA, cross-Kyma module communication.
+Phase 1 implements the cross-component policies. Phase 2 focuses on introducing zero-trust policies for customer-to-telemetry, RMA, and cross-Kyma module communication.
 
 #### Component-specific Policies
 
-All component egress to customer workloads must now be restricted by port number, previously we allowed all egress traffic on any port. The highlighted text indicates the new rules that will be added in Phase 2 to further restrict egress traffic.
+This phase restricts all component egress traffic by port number. Previously, we allowed all egress traffic on any port. The highlighted text in the following sections indicates the new rules that further restrict egress traffic.
 
-Egress rules for the following components will be restricted to only whitelist ports which are used to connect to customer backends. We have a utility function in `metricpipelineutils` which extracts customer backend ports.
+Egress rules for the following components are restricted to only the ports used to connect to customer backends. A utility function in `metricpipelineutils` extracts customer backend ports.
 
 1. **FluentBit Agent**
    - **Network Policy Name:** `kyma-project.io--telemetry-fluent-bit`
