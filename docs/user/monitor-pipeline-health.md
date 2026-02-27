@@ -39,9 +39,8 @@ To understand the meaning of each status condition, see the detailed reference f
 For production environments, set up continuous monitoring by exporting the health metrics to your observability backend, where you can create dashboards and configure alerts using alert rules. For an example, see [Integrate With SAP Cloud Logging](./integration/sap-cloud-logging/README.md)
 
 > [!WARNING] 
-> Scraping the metrics endpoint of the OpenTelemetry Collector instances is forbidden. These metrics are an internal implementation detail and are subject to breaking changes when the underlying Collector is updated. For stable health monitoring, rely on the status conditions of your LogPipeline, MetricPipeline, or TracePipeline custom resources.
-
-To collect these health metrics, you must have at least one active MetricPipeline in your cluster. This pipeline automatically collects and exports health data for all of your pipelines, including LogPipeline and TracePipeline resources.
+> By default, scraping the metrics endpoint of OpenTelemetry Collector instances is not recommended and restricted by a network policy. These metrics are internal implementation details and may change when the Collector is updated. For stable health monitoring, rely on the status conditions of your LogPipeline, MetricPipeline, or TracePipeline custom resources. These metrics are an internal implementation detail and are subject to breaking changes when the underlying Collector is updated. For stable health monitoring, rely on the status conditions of your LogPipeline, MetricPipeline, or TracePipeline custom resources. To collect these health metrics, you must have at least one active MetricPipeline in your cluster. This pipeline automatically collects and exports health data for all of your pipelines, including LogPipeline and TracePipeline resources.
+> If you need to scrape these metrics, you must explicitly add the label `networking.kyma-project.io/metrics-scraping: allowed` to your scraper pod.
 
 The Telemetry module emits the following metrics for health monitoring:
 
