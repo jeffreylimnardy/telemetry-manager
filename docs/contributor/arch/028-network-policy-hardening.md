@@ -120,9 +120,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
 - Harden telemetry manager and self-monitoring because it requires no breaking changes.
 - Separate self-monitoring webhook from admission webhooks in telemetry manager to allow more fine-grained ingress rules.
 
-#### Network Policies After Phase 1
-
-##### Cross-component Policies (use Telemetry module-identifier label selector)
+Phase 1 implements the following cross-component policies with Telemetry module-identifier label selector.
 
 1. **Allow DNS Resolution**
     - **Policy Name:** `kyma-project.io--telemetry-allow-to-dns`
@@ -146,7 +144,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
         - From: Any IP<br>
           Ports: 9443
 
-##### Component-specific Policies
+The following component-specific policies are also implemented in phase 1.
 
 1. **Telemetry Manager**
    - **Network Policy Name:** `kyma-project.io--telemetry-manager`
@@ -243,11 +241,7 @@ We also decided to use the label selector `networking.kyma-project.io/metrics-sc
 - Document the required Pod labels for customer workloads to ensure proper communication with telemetry components.
 
 
-#### Proposed Network Policy Changes for Phase 2
-
 Phase 1 implements the cross-component policies. Phase 2 focuses on introducing zero-trust policies for customer-to-telemetry, RMA, and cross-Kyma module communication.
-
-##### Component-specific Policies
 
 This phase restricts all component egress traffic by port number. Previously, we allowed all egress traffic on any port. The highlighted text in the following sections indicates the new rules that further restrict egress traffic.
 
