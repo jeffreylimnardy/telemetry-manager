@@ -45,11 +45,14 @@ jobs:
         with:
           ref: "refs/pull/${{ github.event.inputs.pr_number }}/head"
           repository: ${{ github.repository }}
+          persist-credentials: false
       - id: set-matrix
         run: |
-          image=${{ github.event.inputs.image }}
+          image=${GITHUB_EVENT_INPUTS_IMAGE}
           matrix=$(jq --arg image "$image" 'map( . | select (.image==$image) )' hack/load-tests/matrix_includes.json)
           echo "matrix={\"include\":$(echo $matrix)}" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_EVENT_INPUTS_IMAGE: ${{ github.event.inputs.image }}
 
   load-test:
     needs: prepare-matrix
@@ -61,13 +64,17 @@ jobs:
 
     steps:
       - name: Test matrix configuration
-        run: echo "input = ${{ github.event.inputs.image }}, matrix = ${{ matrix.image }}"
+        run: echo "input = ${GITHUB_EVENT_INPUTS_IMAGE}, matrix = ${MATRIX_IMAGE}"
+        env:
+          GITHUB_EVENT_INPUTS_IMAGE: ${{ github.event.inputs.image }}
+          MATRIX_IMAGE: ${{ matrix.image }}
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: "refs/pull/${{ github.event.inputs.pr_number }}/head"
           repository: ${{ github.repository }}
+          persist-credentials: false
 
       - name: Setup Golang
         uses: "./.github/template/setup-golang"
@@ -75,9 +82,11 @@ jobs:
       - name: Setup gardener cluster name
         run: |
           ID=$(echo ${{ github.run_id }}${{ github.run_attempt }} | rev )
-          SHORT_NAME=$(echo ${{ matrix.name }} | awk -F- '{for(i=1;i<=NF;i++) printf "%s",substr($i,1,1);print "";}')
+          SHORT_NAME=$(echo ${MATRIX_NAME} | awk -F- '{for(i=1;i<=NF;i++) printf "%s",substr($i,1,1);print "";}')
           GARDENER_CLUSTER_NAME=$(echo lt-${SHORT_NAME}-${ID} | cut -c 1-14)
           echo "GARDENER_CLUSTER_NAME=$GARDENER_CLUSTER_NAME" >> $GITHUB_ENV
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
 
       - name: Save service account to file
         shell: bash
@@ -96,16 +105,26 @@ jobs:
 
       - name: Deploy telemetry
         run: |
-          if [ "${{ github.event.inputs.selfmonitor_pr_image }}" = "true" ]; then
-            export SELF_MONITOR_IMAGE="europe-docker.pkg.dev/kyma-project/dev/tpi/telemetry-self-monitor:PR-${{ github.event.inputs.pr_number }}"
+          if [ "${GITHUB_EVENT_INPUTS_SELFMONITOR_PR_IMAGE}" = "true" ]; then
+            export SELF_MONITOR_IMAGE="europe-docker.pkg.dev/kyma-project/dev/tpi/telemetry-self-monitor:PR-${GITHUB_EVENT_INPUTS_PR_NUMBER}"
           fi
           hack/deploy-telemetry.sh
+        env:
+          GITHUB_EVENT_INPUTS_SELFMONITOR_PR_IMAGE: ${{ github.event.inputs.selfmonitor_pr_image }}
+          GITHUB_EVENT_INPUTS_PR_NUMBER: ${{ github.event.inputs.pr_number }}
 
       - name: Deploy Istio module
         run: hack/deploy-istio.sh
 
       - name: Run load test
-        run: hack/load-tests/run-load-test.sh -n ${{ matrix.name }} -t ${{ matrix.type }} -m ${{ matrix.multi }} -b ${{ matrix.backpressure }} -d ${{ github.event.inputs.duration }} -o "${{ matrix.overlay }}"
+        run: hack/load-tests/run-load-test.sh -n ${MATRIX_NAME} -t ${MATRIX_TYPE} -m ${MATRIX_MULTI} -b ${MATRIX_BACKPRESSURE} -d ${GITHUB_EVENT_INPUTS_DURATION} -o "${MATRIX_OVERLAY}"
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+          MATRIX_TYPE: ${{ matrix.type }}
+          MATRIX_MULTI: ${{ matrix.multi }}
+          MATRIX_BACKPRESSURE: ${{ matrix.backpressure }}
+          GITHUB_EVENT_INPUTS_DURATION: ${{ github.event.inputs.duration }}
+          MATRIX_OVERLAY: ${{ matrix.overlay }}
 
       - name: Upload results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -131,6 +150,7 @@ jobs:
         with:
           ref: "refs/pull/${{ github.event.inputs.pr_number }}/head"
           repository: ${{ github.repository }}
+          persist-credentials: false
       - name: Download results
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

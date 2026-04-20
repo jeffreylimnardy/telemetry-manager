@@ -24,13 +24,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Create tags
         id: create-tags
         run: |
           if [[ $GITHUB_EVENT_NAME == 'push' || $GITHUB_EVENT_NAME == 'merge_group' ]]; then
             {
               echo "tags<<EOTAGS"
-              echo "${{ github.ref_name }}"
+              echo "${GITHUB_REF_NAME}"
               echo "$(git rev-parse --short $GITHUB_SHA)"
               echo "EOTAGS"
             } >> "$GITHUB_OUTPUT"
@@ -63,6 +65,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Send slack message on failure
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1

@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Fetch new env file
         if: github.event_name == 'pull_request_target'
@@ -59,8 +61,8 @@ jobs:
           if [[ $GITHUB_EVENT_NAME == 'push' || $GITHUB_EVENT_NAME == 'merge_group' ]]; then
             {
               echo "tags<<EOTAGS"
-              echo "${{ github.ref_name }}"
-              echo "${{ steps.load-envs.outputs.PROMETHEUS_VERSION }}-${{ steps.get-short-sha.outputs.short-sha }}"
+              echo "${GITHUB_REF_NAME}"
+              echo "${STEPS_LOAD_ENVS_OUTPUTS_PROMETHEUS_VERSION}-${STEPS_GET_SHORT_SHA_OUTPUTS_SHORT_SHA}"
               echo "EOTAGS"
             } >> "$GITHUB_OUTPUT"
           else
@@ -71,6 +73,9 @@ jobs:
               echo "EOTAGS"
             } >> "$GITHUB_OUTPUT"
           fi
+        env:
+          STEPS_LOAD_ENVS_OUTPUTS_PROMETHEUS_VERSION: ${{ steps.load-envs.outputs.PROMETHEUS_VERSION }}
+          STEPS_GET_SHORT_SHA_OUTPUTS_SHORT_SHA: ${{ steps.get-short-sha.outputs.short-sha }}
        
   build-image:
     permissions:
@@ -93,6 +98,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Send slack message on failure
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1

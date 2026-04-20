@@ -56,6 +56,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Validate version format
         env:
           VERSION: ${{ github.event.inputs.version }}
@@ -275,6 +276,7 @@ jobs:
           token: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
           ref: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Golang
         uses: "./.github/template/setup-golang"
@@ -392,9 +394,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
           RELEASE_BRANCH: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
+          STEPS_CREATE_PR_OUTPUTS_PR_NUMBER: ${{ steps.create-pr.outputs.pr-number }}
         timeout-minutes: 120
         run: |
-          PR_NUMBER="${{ steps.create-pr.outputs.pr-number }}"
+          PR_NUMBER="${STEPS_CREATE_PR_OUTPUTS_PR_NUMBER}"
           echo "Waiting for PR #${PR_NUMBER} to be merged (timeout: 120 minutes)..."
 
           MAX_ATTEMPTS=60 
@@ -514,6 +517,7 @@ jobs:
         with:
           ref: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Golang
         uses: "./.github/template/setup-golang"
@@ -571,6 +575,7 @@ jobs:
         with:
           ref: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Verify we're on the merged PR commit
         if: ${{ inputs.force != true }}
         env:
@@ -591,16 +596,19 @@ jobs:
 
       - name: Release
         if: ${{ inputs.dry_run != true }}
-        run: hack/release.sh ${{ inputs.version }}
+        run: hack/release.sh ${INPUTS_VERSION}
         env:
           GITHUB_TOKEN: "${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}"
           GORELEASER_CURRENT_TAG: "${{ inputs.version }}"
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Skip GitHub release (dry run)
         if: ${{ inputs.dry_run == true }}
         run: |
           echo "::notice::DRY RUN: Skipping GitHub release creation"
-          echo "Would have run: hack/release.sh ${{ inputs.version }}"
+          echo "Would have run: hack/release.sh ${INPUTS_VERSION}"
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Package Helm chart
         run: |
@@ -612,9 +620,10 @@ jobs:
         if: ${{ inputs.dry_run != true }}
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+          INPUTS_VERSION: ${{ inputs.version }}
         run: |
           [[ ! -e ${HELM_CHART} ]] && echo "::error ::Packaged Helm chart does not exist" && exit 1
-          gh release upload ${{ inputs.version }} --clobber ${HELM_CHART}
+          gh release upload ${INPUTS_VERSION} --clobber ${HELM_CHART}
 
       - name: Skip Helm chart upload (dry run)
         if: ${{ inputs.dry_run == true }}
@@ -628,10 +637,12 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git checkout gh-pages
-          helm repo index --url https://github.com/${{ github.repository }}/releases/download/${{ inputs.version }} --merge ./index.yaml ./
+          helm repo index --url https://github.com/${{ github.repository }}/releases/download/${INPUTS_VERSION} --merge ./index.yaml ./
           git add index.yaml
-          git commit -m "Update Helm chart metadata for ${{ inputs.version }}"
+          git commit -m "Update Helm chart metadata for ${INPUTS_VERSION}"
           git push origin gh-pages
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Skip gh-pages update (dry run)
         if: ${{ inputs.dry_run == true }}
@@ -643,11 +654,12 @@ jobs:
         if: ${{ inputs.dry_run != true && inputs.module_release == true }}
         env:
           GH_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+          INPUTS_VERSION: ${{ inputs.version }}
         run: |
           echo "Triggering module release for dev channel..."
           gh workflow run submit-module.yml \
-            --ref "${{ github.ref_name }}" \
-            -f version="${{ inputs.version }}" \
+            --ref "${GITHUB_REF_NAME}" \
+            -f version="${INPUTS_VERSION}" \
             -f channel="dev" \
             -f dry_run="false" \
             -f auto_merge="true"
@@ -657,11 +669,12 @@ jobs:
         if: ${{ inputs.dry_run != true && inputs.module_release == true }}
         env:
           GH_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+          INPUTS_VERSION: ${{ inputs.version }}
         run: |
           echo "Triggering module release for fast channel..."
           gh workflow run submit-module.yml \
-            --ref "${{ github.ref_name }}" \
-            -f version="${{ inputs.version }}" \
+            --ref "${GITHUB_REF_NAME}" \
+            -f version="${INPUTS_VERSION}" \
             -f channel="fast" \
             -f dry_run="false" \
             -f auto_merge="true"
@@ -671,11 +684,12 @@ jobs:
         if: ${{ inputs.dry_run != true && inputs.module_release == true }}
         env:
           GH_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+          INPUTS_VERSION: ${{ inputs.version }}
         run: |
           echo "Triggering module release for experimental channel..."
           gh workflow run submit-module.yml \
-            --ref "${{ github.ref_name }}" \
-            -f version="${{ inputs.version }}" \
+            --ref "${GITHUB_REF_NAME}" \
+            -f version="${INPUTS_VERSION}" \
             -f channel="experimental" \
             -f dry_run="false" \
             -f auto_merge="true"
@@ -685,18 +699,18 @@ jobs:
         if: ${{ success() && inputs.dry_run != true }}
         run: |
           cat >> $GITHUB_STEP_SUMMARY <<EOF
-          ##  Release ${{ inputs.version }} Published Successfully!
+          ##  Release ${INPUTS_VERSION} Published Successfully!
 
           ### Release Information
-          - **Release**: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
-          - **Version**: ${{ inputs.version }}
-          - **Branch**: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
-          - **OCC Image**: ${{ github.event.inputs.occ_image_version }}
+          - **Release**: https://github.com/${{ github.repository }}/releases/tag/${INPUTS_VERSION}
+          - **Version**: ${INPUTS_VERSION}
+          - **Branch**: ${NEEDS_VALIDATE_AND_PREPARE_BRANCH_OUTPUTS_RELEASE_BRANCH}
+          - **OCC Image**: ${GITHUB_EVENT_INPUTS_OCC_IMAGE_VERSION}
           - **Helm Chart**: \`${HELM_CHART}\`
 
           ### Docker Images
           \`\`\`
-          europe-docker.pkg.dev/kyma-project/prod/telemetry-manager:${{ inputs.version }}
+          europe-docker.pkg.dev/kyma-project/prod/telemetry-manager:${INPUTS_VERSION}
           \`\`\`
 
           ### Module Releases
@@ -714,15 +728,19 @@ jobs:
           4. Update external documentation if needed
 
           EOF
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
+          NEEDS_VALIDATE_AND_PREPARE_BRANCH_OUTPUTS_RELEASE_BRANCH: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
+          GITHUB_EVENT_INPUTS_OCC_IMAGE_VERSION: ${{ github.event.inputs.occ_image_version }}
       - name: Dry run summary
         if: ${{ inputs.dry_run == true }}
         run: |
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## Dry Run Summary
 
-          **Version**: ${{ inputs.version }}
-          **Release Branch**: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
-          **OCC Image**: ${{ github.event.inputs.occ_image_version }}
+          **Version**: ${INPUTS_VERSION}
+          **Release Branch**: ${NEEDS_VALIDATE_AND_PREPARE_BRANCH_OUTPUTS_RELEASE_BRANCH}
+          **OCC Image**: ${GITHUB_EVENT_INPUTS_OCC_IMAGE_VERSION}
 
           ### Completed (Dry Run)
           - Version validation
@@ -747,3 +765,7 @@ jobs:
           ---
           **To create the actual release**, re-run this workflow with `dry_run` set to `false`.
           EOF
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
+          NEEDS_VALIDATE_AND_PREPARE_BRANCH_OUTPUTS_RELEASE_BRANCH: ${{ needs.validate-and-prepare-branch.outputs.release-branch }}
+          GITHUB_EVENT_INPUTS_OCC_IMAGE_VERSION: ${{ github.event.inputs.occ_image_version }}

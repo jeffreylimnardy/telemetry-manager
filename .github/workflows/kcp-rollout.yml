@@ -78,6 +78,8 @@ jobs:
     steps:
       - name: Checkout repository for config
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Set matrix
         id: set-matrix
@@ -92,7 +94,7 @@ jobs:
           fi
 
           # Substitute {{VERSION}} placeholder with actual version
-          CONFIG=$(echo "$CONFIG" | jq --arg version "${{ inputs.version }}" '
+          CONFIG=$(echo "$CONFIG" | jq --arg version "${INPUTS_VERSION}" '
             walk(
               if type == "string" then
                 gsub("{{VERSION}}"; $version)
@@ -111,6 +113,8 @@ jobs:
           echo "MATRIX_EOF" >> "$GITHUB_OUTPUT"
 
           echo "Loaded configuration for ${{ inputs.target_chart }} chart"
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
 
   release-chart:
     name: Release ${{ matrix.chart_name }} Chart
@@ -129,6 +133,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: telemetry-manager
+          persist-credentials: false
 
       - name: Configure git authentication
         uses: ./telemetry-manager/.github/template/setup-git-auth
@@ -141,8 +146,10 @@ jobs:
           # Clone using HTTPS without token in URL (uses credential helper)
           git clone \
             "https://${GH_HOST}/${REPO}.git" \
-            --branch ${{ matrix.base_branch }} \
+            --branch ${MATRIX_BASE_BRANCH} \
             management-plane-charts
+        env:
+          MATRIX_BASE_BRANCH: ${{ matrix.base_branch }}
 
       - name: Configure git identity
         working-directory: management-plane-charts
@@ -176,7 +183,9 @@ jobs:
 
       - name: Update chart files
         working-directory: management-plane-charts
-        run: ${{ matrix.update_command }}
+        run: ${MATRIX_UPDATE_COMMAND}
+        env:
+          MATRIX_UPDATE_COMMAND: ${{ matrix.update_command }}
 
       - name: Verify changes
         working-directory: management-plane-charts
@@ -185,38 +194,49 @@ jobs:
           git diff
 
           if git diff --quiet; then
-            echo "::error::No changes detected. Chart may already be at version ${{ inputs.version }}"
+            echo "::error::No changes detected. Chart may already be at version ${INPUTS_VERSION}"
             exit 1
           fi
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Verify update was applied
         working-directory: management-plane-charts
         run: |
-          CURRENT_VERSION=$(${{ matrix.verify_command }})
-          if [ "$CURRENT_VERSION" != "${{ inputs.version }}" ]; then
-            echo "::error::${{ matrix.verify_field }} mismatch. Expected: ${{ inputs.version }}, Got: $CURRENT_VERSION"
+          CURRENT_VERSION=$(${MATRIX_VERIFY_COMMAND})
+          if [ "$CURRENT_VERSION" != "${INPUTS_VERSION}" ]; then
+            echo "::error::${MATRIX_VERIFY_FIELD} mismatch. Expected: ${INPUTS_VERSION}, Got: $CURRENT_VERSION"
             exit 1
           fi
-          echo "${{ matrix.verify_field }} verified: $CURRENT_VERSION"
+          echo "${MATRIX_VERIFY_FIELD} verified: $CURRENT_VERSION"
+        env:
+          MATRIX_VERIFY_COMMAND: ${{ matrix.verify_command }}
+          INPUTS_VERSION: ${{ inputs.version }}
+          MATRIX_VERIFY_FIELD: ${{ matrix.verify_field }}
 
       - name: Commit changes
         working-directory: management-plane-charts
         run: |
           git add .
-          git commit -m "${{ matrix.commit_title }}"
+          git commit -m "${MATRIX_COMMIT_TITLE}"
+        env:
+          MATRIX_COMMIT_TITLE: ${{ matrix.commit_title }}
 
       - name: Push branch
         if: ${{ inputs.dry_run != true }}
         working-directory: management-plane-charts
         run: |
-          git push origin ${{ matrix.branch_prefix }}-${{ inputs.version }}
+          git push origin ${MATRIX_BRANCH_PREFIX}-${INPUTS_VERSION}
+        env:
+          MATRIX_BRANCH_PREFIX: ${{ matrix.branch_prefix }}
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Create PR
         if: ${{ inputs.dry_run != true }}
         id: create-pr
         working-directory: management-plane-charts
         run: |
-          BRANCH_NAME="${{ matrix.branch_prefix }}-${{ inputs.version }}"
+          BRANCH_NAME="${MATRIX_BRANCH_PREFIX}-${INPUTS_VERSION}"
 
           # Check if PR already exists for this branch
           echo "Checking if PR already exists for branch: ${BRANCH_NAME}..."
@@ -246,10 +266,10 @@ jobs:
           echo "No existing PR found. Creating new PR..."
 
           PR_URL=$(gh pr create \
-            --base ${{ matrix.base_branch }} \
+            --base ${MATRIX_BASE_BRANCH} \
             --head "${BRANCH_NAME}" \
-            --title "${{ matrix.pr_title }}" \
-            --body "${{ matrix.pr_body }}" \
+            --title "${MATRIX_PR_TITLE}" \
+            --body "${MATRIX_PR_BODY}" \
             --label pr-deploy)
 
           # Extract and validate PR number
@@ -263,31 +283,43 @@ jobs:
           echo "pr-url=${PR_URL}" >> "$GITHUB_OUTPUT"
           echo "pr-number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "Created PR #${PR_NUMBER}: ${PR_URL}"
+        env:
+          MATRIX_BRANCH_PREFIX: ${{ matrix.branch_prefix }}
+          INPUTS_VERSION: ${{ inputs.version }}
+          MATRIX_BASE_BRANCH: ${{ matrix.base_branch }}
+          MATRIX_PR_TITLE: ${{ matrix.pr_title }}
+          MATRIX_PR_BODY: ${{ matrix.pr_body }}
 
       - name: Enable auto-merge
         if: ${{ inputs.dry_run != true && inputs.auto_merge == true }}
         working-directory: management-plane-charts
         run: |
-          gh pr merge ${{ steps.create-pr.outputs.pr-number }} --auto --squash
-          echo "Auto-merge enabled for PR #${{ steps.create-pr.outputs.pr-number }}"
+          gh pr merge ${STEPS_CREATE_PR_OUTPUTS_PR_NUMBER} --auto --squash
+          echo "Auto-merge enabled for PR #${STEPS_CREATE_PR_OUTPUTS_PR_NUMBER}"
+        env:
+          STEPS_CREATE_PR_OUTPUTS_PR_NUMBER: ${{ steps.create-pr.outputs.pr-number }}
 
       - name: Skip PR creation (dry run)
         if: ${{ inputs.dry_run == true }}
         run: |
           echo "::notice::DRY RUN: Skipping PR creation"
           echo "Would have created PR with:"
-          echo "  Branch: ${{ matrix.branch_prefix }}-${{ inputs.version }}"
-          echo "  Title: ${{ matrix.pr_title }}"
+          echo "  Branch: ${MATRIX_BRANCH_PREFIX}-${INPUTS_VERSION}"
+          echo "  Title: ${MATRIX_PR_TITLE}"
           echo "  Label: pr-deploy"
+        env:
+          MATRIX_BRANCH_PREFIX: ${{ matrix.branch_prefix }}
+          INPUTS_VERSION: ${{ inputs.version }}
+          MATRIX_PR_TITLE: ${{ matrix.pr_title }}
 
       - name: Workflow summary
         if: always()
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## ${{ matrix.summary_title }}
+          ## ${MATRIX_SUMMARY_TITLE}
 
-          **Version**: ${{ inputs.version }}
-          **Branch**: ${{ matrix.branch_prefix }}-${{ inputs.version }}
+          **Version**: ${INPUTS_VERSION}
+          **Branch**: ${MATRIX_BRANCH_PREFIX}-${INPUTS_VERSION}
           **Dry Run**: ${{ inputs.dry_run }}
           **Auto Merge**: ${{ inputs.auto_merge }}
           ${{ inputs.dry_run != true && format('**PR**: {0}', steps.create-pr.outputs.pr-url) || '' }}
@@ -298,3 +330,7 @@ jobs:
           ${{ inputs.dry_run != true && inputs.auto_merge != true && '3. Merge the PR to deploy' || '' }}
           ${{ inputs.dry_run != true && inputs.auto_merge == true && '3. PR will auto-merge when checks pass' || '' }}
           EOF
+        env:
+          MATRIX_SUMMARY_TITLE: ${{ matrix.summary_title }}
+          INPUTS_VERSION: ${{ inputs.version }}
+          MATRIX_BRANCH_PREFIX: ${{ matrix.branch_prefix }}

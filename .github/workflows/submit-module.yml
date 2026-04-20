@@ -67,6 +67,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Validate version format
         uses: ./.github/template/validate-semver
@@ -159,6 +161,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: telemetry-manager
+          persist-credentials: false
 
       - name: Configure git authentication
         uses: ./telemetry-manager/.github/template/setup-git-auth
@@ -244,11 +247,13 @@ jobs:
 
           # Check for any changes including untracked files
           if [ -z "$(git status --porcelain)" ]; then
-            echo "::error::No changes detected. Module may already be at version ${{ inputs.version }}"
+            echo "::error::No changes detected. Module may already be at version ${INPUTS_VERSION}"
             exit 1
           fi
 
           echo "Changes detected and ready to commit"
+        env:
+          INPUTS_VERSION: ${{ inputs.version }}
 
       - name: Commit changes
         if: ${{ !inputs.dry_run }}
@@ -361,8 +366,9 @@ jobs:
           VERSION: ${{ inputs.version }}
           CHANNEL: ${{ inputs.channel }}
           GH_TOKEN: ${{ secrets.HUSKIES_GHTOOLS_TOKEN }}
+          STEPS_CREATE_PR_OUTPUTS_PR_NUMBER: ${{ steps.create-pr.outputs.pr-number }}
         run: |
-          PR_NUMBER="${{ steps.create-pr.outputs.pr-number }}"
+          PR_NUMBER="${STEPS_CREATE_PR_OUTPUTS_PR_NUMBER}"
 
           echo "Enabling auto-merge for PR #${PR_NUMBER}..."
           gh pr merge "${PR_NUMBER}" --auto --squash
@@ -375,6 +381,7 @@ jobs:
           CHANNEL: ${{ inputs.channel }}
           DRY_RUN: ${{ inputs.dry_run }}
           AUTO_MERGE: ${{ inputs.auto_merge }}
+          STEPS_CREATE_PR_OUTPUTS_PR_URL: ${{ steps.create-pr.outputs.pr-url }}
         run: |
           if [ "${CHANNEL}" = "experimental" ]; then
             VERSION_TAG="${VERSION}-experimental"
@@ -398,7 +405,7 @@ jobs:
 
           if [ "${DRY_RUN}" = "false" ]; then
             cat >> $GITHUB_STEP_SUMMARY <<EOF
-          **PR**: ${{ steps.create-pr.outputs.pr-url }}
+          **PR**: ${STEPS_CREATE_PR_OUTPUTS_PR_URL}
           EOF
           fi
 
@@ -427,7 +434,7 @@ jobs:
             cat >> $GITHUB_STEP_SUMMARY <<EOF
 
           ### Next Steps
-          1. Auto-merge is enabled on PR ${{ steps.create-pr.outputs.pr-url }}
+          1. Auto-merge is enabled on PR ${STEPS_CREATE_PR_OUTPUTS_PR_URL}
           2. PR will be merged automatically once all checks pass
           3. Module will be published after merge
           EOF
@@ -435,7 +442,7 @@ jobs:
             cat >> $GITHUB_STEP_SUMMARY <<EOF
 
           ### Next Steps
-          1. Review the PR at ${{ steps.create-pr.outputs.pr-url }}
+          1. Review the PR at ${STEPS_CREATE_PR_OUTPUTS_PR_URL}
           2. Verify the module-config.yaml and module-releases.yaml changes
           3. Merge the PR to publish the module
           EOF
